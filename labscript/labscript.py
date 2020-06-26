@@ -188,7 +188,7 @@ class Device(object):
     @set_passed_properties(
         property_names = {"device_properties": ["added_properties"]}
         )
-    def __init__(self,name,parent_device,connection, call_parents_add_device=True, 
+    def __init__(self,name,parent_device,connection, call_parents_add_device=True, worker_host="",
                  added_properties = {}, gui=None, worker=None, start_order=None, stop_order=None, **kwargs):
         # Verify that no invalid kwargs were passed and the set properties
         if len(kwargs) != 0:        
@@ -213,6 +213,9 @@ class Device(object):
         for location in labscript_utils.properties.VALID_PROPERTY_LOCATIONS:
             if location not in self._properties:
                 self._properties[location] = {}
+
+        if worker_host != "":
+            self.set_property('worker_host', worker_host, location='connection_table_properties', overwrite=True)
 
         if parent_device and call_parents_add_device:
             # This is optional by keyword argument, so that subclasses
@@ -2209,6 +2212,8 @@ def save_labscripts(hdf5_file):
     except ImportError:
         pass
     except WindowsError if os.name == 'nt' else None:
+        pass
+        #remove annoying warning
         sys.stderr.write('Warning: Cannot save Mercurial data for imported scripts. Check that the hg command can be run from the command line.\n')
 
 
