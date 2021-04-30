@@ -1225,8 +1225,20 @@ class Output(Device):
                 instruction = self.apply_calibration(instruction,units)
             # if we have limits, check the value is valid
             if self.limits:
-                if (instruction < self.limits[0]) or (instruction > self.limits[1]):
+                #Old:
+                # if (instruction < self.limits[0]) or (instruction > self.limits[1]):
+                #     raise LabscriptError('You cannot program the value %s (base units) to %s as it falls outside the limits (%d to %d)'%(str(instruction), self.name, self.limits[0], self.limits[1]))
+                #New:
+                # Limit precision to 1e-10:
+                epsilon = 1e-10
+                if ((instruction + epsilon) < self.limits[0]) or ((instruction - epsilon) > self.limits[1]):
                     raise LabscriptError('You cannot program the value %s (base units) to %s as it falls outside the limits (%d to %d)'%(str(instruction), self.name, self.limits[0], self.limits[1]))
+                # If numerical precision error, realise it and set value to limit:
+                if (abs(instruction - self.limits[0]) < epsilon):
+                    instruction = self.limits[0]
+                elif (abs(instruction - self.limits[1]) < epsilon):
+                    instruction = self.limits[1]
+
         self.instructions[time] = instruction
     
     def do_checks(self, trigger_times):
