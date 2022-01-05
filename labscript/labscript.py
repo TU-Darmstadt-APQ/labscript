@@ -3706,3 +3706,26 @@ class compiler(object):
 
     # safety measure in case cleanup is called before init
     _existing_builtins_dict = _builtins_dict.copy() 
+
+
+def init_run(shot_callback, path, logger):
+    runner.shot_id = 0
+    runner.shot_callback = shot_callback
+    runner.logger = logger
+    runner.runfile_path = path
+
+def run_shot(shot_name):
+    runner.shot_callback(
+        shot_name, 
+        runner.shot_id, 
+        runner.runfile_path, 
+        runner.logger
+    )
+    runner.shot_id = runner.shot_id + 1
+
+
+class runner(object):
+    shot_id = 0
+    shot_callback = None
+    logger = None
+    runfile_path = ""
