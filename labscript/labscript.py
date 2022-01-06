@@ -3714,12 +3714,13 @@ def init_run(shot_callback, path, logger):
     runner.logger = logger
     runner.runfile_path = path
 
-def run_shot(shot_name):
+def run_shot(shot_name, extra_runglobals = {}):
     runner.shot_callback(
         shot_name, 
         runner.shot_id, 
         runner.runfile_path, 
-        runner.logger
+        runner.logger,
+        extra_runglobals
     )
     runner.shot_id = runner.shot_id + 1
 
