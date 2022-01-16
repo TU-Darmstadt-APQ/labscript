@@ -14,6 +14,7 @@
 import builtins
 import os
 import sys
+import time
 import subprocess
 import keyword
 import threading
@@ -3384,6 +3385,9 @@ def generate_wait_table(hdf5_file):
 def generate_code():
     """Compiles a shot and saves it to the shot file.
     """
+
+    start_time = time.time()
+
     if compiler.hdf5_filename is None:
         raise LabscriptError('hdf5 file for compilation not set. Please call labscript_init')
     elif not os.path.exists(compiler.hdf5_filename):
@@ -3415,6 +3419,8 @@ def generate_code():
         # Save shot properties:
         group = hdf5_file.create_group('shot_properties')
         set_attributes(group, compiler.shot_properties)
+    
+    print("generate_code: %.3fs"%(time.time() - start_time))
 
 
 def trigger_all_pseudoclocks(t='initial'):
@@ -3708,10 +3714,9 @@ class compiler(object):
     _existing_builtins_dict = _builtins_dict.copy() 
 
 
-def init_run(shot_callback, path, logger):
+def init_run(shot_callback, path):
     runner.shot_id = 0
     runner.shot_callback = shot_callback
-    runner.logger = logger
     runner.runfile_path = path
 
 def run_shot(shot_name, extra_runglobals = {}):
@@ -3719,14 +3724,16 @@ def run_shot(shot_name, extra_runglobals = {}):
         shot_name, 
         runner.shot_id, 
         runner.runfile_path, 
-        runner.logger,
         extra_runglobals
     )
     runner.shot_id = runner.shot_id + 1
 
+def cleanup_run():
+    runner.shot_id = 0
+    runner.shot_callback = None
+    runner.runfile_path = ""
 
 class runner(object):
     shot_id = 0
     shot_callback = None
-    logger = None
     runfile_path = ""
