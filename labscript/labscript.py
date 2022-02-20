@@ -2676,6 +2676,26 @@ class Trigger(DigitalOut):
                                  'to %s must be \'trigger\', not \'%s\''%(self.name, repr(device.connection)))
         DigitalOut.add_device(self, device)
 
+
+class JumpDevice(object):
+
+    # @set_passed_properties(property_names={})
+    def __init__(
+        self,
+        name,
+        parent_device,
+        jump_condition_input_trigger,
+        jump_condition_inputs
+    ):
+        if compiler.jump_device is not None:
+            raise LabscriptError("Cannot instantiate a second JumpDevice: there can be only be one in the experiment")
+        compiler.jump_device = self
+        
+        self.name = name
+        self.parent_device = parent_device 
+        self.jump_condition_input_trigger = jump_condition_input_trigger
+        self.jump_condition_inputs = jump_condition_inputs
+
         
 class WaitMonitor(Trigger):
     
@@ -3348,6 +3368,23 @@ def write_device_properties(hdf5_file):
             labscript_utils.properties.set_device_properties(hdf5_file, device.name, device_properties)
 
 
+def generate_jump_table(hdf5_file):
+
+    dtypes = [('label','a256'), ('time', float), ('to_time', float)]
+    data_array = zeros(len(compiler.jump_table), dtype=dtypes)
+
+    for i, t in enumerate(sorted(compiler.jump_table)):
+        label, to_time = compiler.jump_table[t]
+        data_array[i] = label, t, to_time
+    dataset = hdf5_file.create_dataset('jumps', data = data_array)
+
+    jump_device = ''
+    if compiler.jump_device is not None:
+        jump_device = compiler.jump_device.parent_device.name
+
+    dataset.attrs['jump_device'] = jump_device
+
+
 def generate_wait_table(hdf5_file):
     """Generates the wait table for the shot and saves it to the shot file.
 
@@ -3410,6 +3447,7 @@ def generate_code():
         generate_connection_table(hdf5_file)
         write_device_properties(hdf5_file)
         generate_wait_table(hdf5_file)
+        generate_jump_table(hdf5_file)
         save_labscripts(hdf5_file)
 
         # Save shot properties:
@@ -3438,6 +3476,21 @@ def trigger_all_pseudoclocks(t='initial'):
     max_delay = max(compiler.trigger_duration + master_pseudoclock_delay, max_delay_time)    
     return max_delay + wait_delay
     
+    
+def jump(label, t, t_jump):
+    if not str(label):
+        raise LabscriptError('Jumps must have a name')
+    max_delay = trigger_all_pseudoclocks(t)
+    if t in compiler.jump_table:
+        raise LabscriptError('There is already a jump at t=%s'%str(t))
+    if any([label==existing_label for existing_label, _ in compiler.jump_table.values()]):
+        raise LabscriptError('There is already a jump named %s'%str(label))
+
+    compiler.jump_table[t] = str(label), float(t_jump)
+
+    return max_delay
+
+
 def wait(label, t, timeout=5):
     """Commands pseudoclocks to pause until resumed by an external trigger, or a timeout is reached.
 
@@ -3671,6 +3724,8 @@ def labscript_cleanup():
     compiler.start_called = False
     compiler.wait_table = {}
     compiler.wait_monitor = None
+    compiler.jump_table = {}
+    compiler.jump_device = None
     compiler.master_pseudoclock = None
     compiler.all_pseudoclocks = None
     compiler.trigger_duration = 0
@@ -3694,6 +3749,8 @@ class compiler(object):
     start_called = False
     wait_table = {}
     wait_monitor = None
+    jump_table = {}
+    jump_device = None
     master_pseudoclock = None
     all_pseudoclocks = None
     trigger_duration = 0
