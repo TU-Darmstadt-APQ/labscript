@@ -767,6 +767,9 @@ class Pseudoclock(Device):
         # include trigger times in change_times, so that pseudoclocks always have an instruction immediately following a wait:
         all_change_times.extend(self.parent_device.trigger_times)
         
+        print(all_change_times, "all_change_times")
+        print(self.parent_device.trigger_times, "trigger_times")
+
         ####################################################################################################
         # Find out whether any other clockline has a change time during a ramp on another clockline.       #
         # If it does, we need to let the ramping clockline know it needs to break it's loop at that time   #
@@ -792,6 +795,7 @@ class Pseudoclock(Device):
         # Get rid of duplicates:
         all_change_times = list(set(all_change_times_numpy))
         all_change_times.sort()  
+        print("all_change_times, sorted", all_change_times)
         
         # Check that the pseudoclock can handle updates this fast
         for i, t in enumerate(all_change_times[:-1]):
@@ -862,6 +866,9 @@ class Pseudoclock(Device):
             # so modifying it won't update the list in the dictionary.
             # So store the updated list in the dictionary
             change_times[clock_line] = change_time_list
+
+            print(all_change_times, change_times)
+
         return all_change_times, change_times
     
     def expand_change_times(self, all_change_times, change_times, outputs_by_clockline):
@@ -1069,6 +1076,7 @@ class Pseudoclock(Device):
             for output in outputs_by_clockline[clock_line]:
                 # call make_timeseries to expand the list of instructions for each change_time on this clock line
                 output.make_timeseries(clock_line_change_times)
+                print(clock_line_change_times)
 
         # now generate the clock meta data for the Pseudoclock
         # also generate everytime point each clock line will tick (expand ramps)
@@ -1244,6 +1252,7 @@ class PseudoclockDevice(TriggerableDevice):
                                      'Pseudoclocks triggering each other in series is not supported.')
         self.trigger_times = []
         self.wait_times = []
+        self.jump_times = []
         self.initial_trigger_time = 0
     
     @property    
@@ -1267,7 +1276,7 @@ class PseudoclockDevice(TriggerableDevice):
         else:
             self.initial_trigger_time = t
             
-    def trigger(self, t, duration, wait_delay = 0):
+    def trigger(self, t, duration, wait_delay = 0, is_jump = False):
         """Ask the trigger device to produce a digital pulse of a given duration
         to trigger this pseudoclock.
 
@@ -1284,9 +1293,14 @@ class PseudoclockDevice(TriggerableDevice):
                 # Make the wait monitor pulse to signify starting or resumption of the experiment:
                 compiler.wait_monitor.trigger(t, duration)
             self.trigger_times.append(t)
+            if is_jump:
+                self.jump_times.append(t)
         else:
             TriggerableDevice.trigger(self, t, duration)
             self.trigger_times.append(round(t + wait_delay,10))
+            if is_jump:
+                self.jump_times.append(round(t + wait_delay,10))
+            
             
     def do_checks(self, outputs):
         """Basic error checking to ensure the user's instructions make sense.
@@ -3477,6 +3491,10 @@ def trigger_all_pseudoclocks(t='initial'):
     return max_delay + wait_delay
     
     
+def jump_point(t):
+    max_delay = trigger_all_pseudoclocks(t)
+    return max_delay
+
 def jump(label, t, t_jump):
     if not str(label):
         raise LabscriptError('Jumps must have a name')
