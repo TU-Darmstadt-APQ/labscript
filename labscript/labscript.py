@@ -1289,9 +1289,10 @@ class PseudoclockDevice(TriggerableDevice):
             t = self.initial_trigger_time
         t = round(t,10)
         if self.is_master_pseudoclock:
-            if compiler.wait_monitor is not None:
-                # Make the wait monitor pulse to signify starting or resumption of the experiment:
-                compiler.wait_monitor.trigger(t, duration)
+            if not is_jump:
+                if compiler.wait_monitor is not None:
+                    # Make the wait monitor pulse to signify starting or resumption of the experiment:
+                    compiler.wait_monitor.trigger(t, duration)
             self.trigger_times.append(t)
             if is_jump:
                 self.jump_times.append(t)
@@ -3469,7 +3470,7 @@ def generate_code():
         set_attributes(group, compiler.shot_properties)
 
 
-def trigger_all_pseudoclocks(t='initial'):
+def trigger_all_pseudoclocks(t='initial', is_jump=False):
     # Must wait this long before providing a trigger, in case child clocks aren't ready yet:
     wait_delay = compiler.wait_delay
     if type(t) in [str, bytes] and t == 'initial':
@@ -3477,7 +3478,7 @@ def trigger_all_pseudoclocks(t='initial'):
         wait_delay = 0
     # Trigger them all:
     for pseudoclock in compiler.all_pseudoclocks:
-        pseudoclock.trigger(t, compiler.trigger_duration)
+        pseudoclock.trigger(t, compiler.trigger_duration, is_jump=is_jump)
     # How long until all devices can take instructions again? The user
     # can command output from devices on the master clock immediately,
     # but unless things are time critical, they can wait this long and
@@ -3492,13 +3493,13 @@ def trigger_all_pseudoclocks(t='initial'):
     
     
 def jump_point(t):
-    max_delay = trigger_all_pseudoclocks(t)
+    max_delay = trigger_all_pseudoclocks(t, is_jump=True)
     return max_delay
 
 def jump(label, t, t_jump):
     if not str(label):
         raise LabscriptError('Jumps must have a name')
-    max_delay = trigger_all_pseudoclocks(t)
+    max_delay = trigger_all_pseudoclocks(t, is_jump=True)
     if t in compiler.jump_table:
         raise LabscriptError('There is already a jump at t=%s'%str(t))
     if any([label==existing_label for existing_label, _ in compiler.jump_table.values()]):
