@@ -15,6 +15,7 @@ import builtins
 import os
 import sys
 import subprocess
+import socket
 import keyword
 import threading
 from inspect import getcallargs
@@ -330,6 +331,22 @@ class Device(object):
             # store worker and gui as properties of the connection table
             self.set_property('gui', gui.name, 'connection_table_properties')
             self.set_property('worker', worker.name, 'connection_table_properties')
+            self.address = worker.connection.split(':')[0]
+        else:
+            
+            # find local ip (instead of just "localhost")
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0)
+            try:
+                # doesn't even have to be reachable
+                s.connect(('8.8.8.8', 1))
+                self.address = s.getsockname()[0]
+            except Exception:
+                self.address = '127.0.0.1'
+            finally:
+                s.close()
+
+        self.set_property('address', self.address, 'connection_table_properties', True)
             
 
     def set_property(self, name, value, location=None, overwrite=False):
@@ -1289,10 +1306,9 @@ class PseudoclockDevice(TriggerableDevice):
             t = self.initial_trigger_time
         t = round(t,10)
         if self.is_master_pseudoclock:
-            if not is_jump:
-                if compiler.wait_monitor is not None:
-                    # Make the wait monitor pulse to signify starting or resumption of the experiment:
-                    compiler.wait_monitor.trigger(t, duration)
+            if compiler.wait_monitor is not None:
+                # Make the wait monitor pulse to signify starting or resumption of the experiment:
+                compiler.wait_monitor.trigger(t, duration)
             self.trigger_times.append(t)
             if is_jump:
                 self.jump_times.append(t)
@@ -3212,7 +3228,16 @@ def generate_connection_table(hdf5_file):
         master_pseudoclock_name = 'None'
     else:
         master_pseudoclock_name = compiler.master_pseudoclock.name
+    if compiler.jump_device is None:
+        jump_device = 'None'
+        jump_device_address = 'None'
+    else:
+        jump_device = compiler.jump_device.parent_device.name
+        jump_device_address = compiler.jump_device.parent_device.address
+
     dataset.attrs['master_pseudoclock'] = master_pseudoclock_name
+    dataset.attrs['jump_device'] = jump_device
+    dataset.attrs['jump_device_address'] = jump_device_address
 
 # Create a dictionary for caching results from vcs commands. The keys will be
 # the paths to files that are saved during save_labscripts(). The values will be
@@ -3394,10 +3419,13 @@ def generate_jump_table(hdf5_file):
     dataset = hdf5_file.create_dataset('jumps', data = data_array)
 
     jump_device = ''
+    jump_device_address = ''
     if compiler.jump_device is not None:
         jump_device = compiler.jump_device.parent_device.name
+        jump_device_address = compiler.jump_device.parent_device.address
 
     dataset.attrs['jump_device'] = jump_device
+    dataset.attrs['jump_device_address'] = jump_device_address
 
 
 def generate_wait_table(hdf5_file):
