@@ -920,6 +920,7 @@ class Pseudoclock(Device):
         # for clock_line, times in change_times.items():
             # print '%s: %s'%(clock_line.name, times)
         for i, time in enumerate(all_change_times):
+            # TODO: maybe check if it is a jump point?
             if time in self.parent_device.trigger_times[1:]:
                 # A wait instruction:
                 clock.append('WAIT')
@@ -1099,7 +1100,7 @@ class Pseudoclock(Device):
                 # call make_timeseries to expand the list of instructions for each change_time on this clock line
                 output.make_timeseries(clock_line_change_times)
 
-                print(clock_line_change_times)
+        print(clock_line_change_times)
 
         # now generate the clock meta data for the Pseudoclock
         # also generate everytime point each clock line will tick (expand ramps)
