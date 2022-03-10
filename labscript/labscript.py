@@ -783,6 +783,10 @@ class Pseudoclock(Device):
         all_change_times.append(self.parent_device.stop_time)
         # include trigger times in change_times, so that pseudoclocks always have an instruction immediately following a wait:
         all_change_times.extend(self.parent_device.trigger_times)
+
+        all_change_times.extend(compiler.jump_change_times)
+        print("Added ", compiler.jump_change_times)
+        print("ALL", all_change_times)
         
         print(all_change_times, "all_change_times")
         print(self.parent_device.trigger_times, "trigger_times")
@@ -833,7 +837,7 @@ class Pseudoclock(Device):
             # single instruction. So we'll add 0 as a change time:
             if not change_time_list:
                 change_time_list.append(0)
-            
+
             # quantise the all change times to the pseudoclock clock resolution
             # change_time_list = (array(change_time_list)/self.clock_resolution).round()*self.clock_resolution
             change_time_list = self.quantise_to_pseudoclock(change_time_list)
@@ -1090,9 +1094,11 @@ class Pseudoclock(Device):
         # for each clock line
         for clock_line, clock_line_change_times in change_times.items():
             # and for each output on the clockline
+
             for output in outputs_by_clockline[clock_line]:
                 # call make_timeseries to expand the list of instructions for each change_time on this clock line
                 output.make_timeseries(clock_line_change_times)
+
                 print(clock_line_change_times)
 
         # now generate the clock meta data for the Pseudoclock
@@ -1293,6 +1299,9 @@ class PseudoclockDevice(TriggerableDevice):
         else:
             self.initial_trigger_time = t
             
+    def add_jump_cut(self, t):
+        self.jump_times.append(t)
+
     def trigger(self, t, duration, wait_delay = 0, is_jump = False):
         """Ask the trigger device to produce a digital pulse of a given duration
         to trigger this pseudoclock.
@@ -1308,15 +1317,18 @@ class PseudoclockDevice(TriggerableDevice):
         if self.is_master_pseudoclock:
             if compiler.wait_monitor is not None:
                 # Make the wait monitor pulse to signify starting or resumption of the experiment:
-                compiler.wait_monitor.trigger(t, duration)
+                print(f"Trigger wait monitor at {t} for {duration}")
+                if not is_jump:
+                    print("Trigger wait monitor")
+                    compiler.wait_monitor.trigger(t, duration)
             self.trigger_times.append(t)
-            if is_jump:
-                self.jump_times.append(t)
+            # if is_jump:
+            #     self.jump_times.append(t)
         else:
             TriggerableDevice.trigger(self, t, duration)
             self.trigger_times.append(round(t + wait_delay,10))
-            if is_jump:
-                self.jump_times.append(round(t + wait_delay,10))
+            # if is_jump:
+            #     self.jump_times.append(round(t + wait_delay,10))
             
             
     def do_checks(self, outputs):
@@ -3521,21 +3533,41 @@ def trigger_all_pseudoclocks(t='initial', is_jump=False):
     
     
 def jump_point(t):
-    max_delay = trigger_all_pseudoclocks(t, is_jump=True)
-    return max_delay
+    #max_delay = trigger_all_pseudoclocks(t, is_jump=True)
+    #trigger_all_pseudoclocks(t+0.0015, is_jump=True)
+
+    # compiler.jump_change_times.append(t+0.00001)
+    # compiler.jump_change_times.append(t+0.00101)
+    compiler.jump_change_times.append(t-0.0001)
+    compiler.jump_change_times.append(t+0.0001)
+    compiler.jump_change_times.append(t)
+
+    return 0.0025
 
 def jump(label, t, t_jump):
     if not str(label):
         raise LabscriptError('Jumps must have a name')
-    max_delay = trigger_all_pseudoclocks(t, is_jump=True)
+    # max_delay = trigger_all_pseudoclocks(t, is_jump=True)
+    # max_delay = trigger_all_pseudoclocks(t+0.001, is_jump=True)
     if t in compiler.jump_table:
         raise LabscriptError('There is already a jump at t=%s'%str(t))
     if any([label==existing_label for existing_label, _ in compiler.jump_table.values()]):
         raise LabscriptError('There is already a jump named %s'%str(label))
 
+
+    compiler.jump_change_times.append(t-0.0001)
+    compiler.jump_change_times.append(t+0.0001)
+    compiler.jump_change_times.append(t)
+
+    for pseudoclock in compiler.all_pseudoclocks:
+        pseudoclock.add_jump_cut(t)
+        pseudoclock.add_jump_cut(t_jump)
+
+    compiler.wait_monitor.trigger(t_jump+0.0001, compiler.trigger_duration)
+
     compiler.jump_table[t] = str(label), float(t_jump)
 
-    return max_delay
+    return 0.0025
 
 
 def wait(label, t, timeout=5):
@@ -3782,6 +3814,7 @@ def labscript_cleanup():
     compiler.save_hg_info = _SAVE_HG_INFO
     compiler.save_git_info = _SAVE_GIT_INFO
     compiler.shot_properties = {}
+    compiler.jump_change_times = []
 
 class compiler(object):
     """Compiler object that saves relevant parameters during
@@ -3807,6 +3840,7 @@ class compiler(object):
     save_hg_info = _SAVE_HG_INFO
     save_git_info = _SAVE_GIT_INFO
     shot_properties = {}
+    jump_change_times = []
 
     # safety measure in case cleanup is called before init
     _existing_builtins_dict = _builtins_dict.copy() 
