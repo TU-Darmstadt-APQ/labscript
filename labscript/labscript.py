@@ -786,8 +786,8 @@ class Pseudoclock(Device):
 
         all_change_times.extend(compiler.jump_change_times)
         
-        print(all_change_times, "all_change_times")
-        print(self.parent_device.trigger_times, "trigger_times")
+        # print(all_change_times, "all_change_times")
+        # print(self.parent_device.trigger_times, "trigger_times")
 
         ####################################################################################################
         # Find out whether any other clockline has a change time during a ramp on another clockline.       #
@@ -814,7 +814,7 @@ class Pseudoclock(Device):
         # Get rid of duplicates:
         all_change_times = list(set(all_change_times_numpy))
         all_change_times.sort()  
-        print("all_change_times, sorted", all_change_times)
+        #print("all_change_times, sorted", all_change_times)
         
         # Check that the pseudoclock can handle updates this fast
         for i, t in enumerate(all_change_times[:-1]):
@@ -886,7 +886,7 @@ class Pseudoclock(Device):
             # So store the updated list in the dictionary
             change_times[clock_line] = change_time_list
 
-            print(all_change_times, change_times)
+            #print(all_change_times, change_times)
 
         return all_change_times, change_times
     
@@ -1102,8 +1102,6 @@ class Pseudoclock(Device):
             for output in outputs_by_clockline[clock_line]:
                 # call make_timeseries to expand the list of instructions for each change_time on this clock line
                 output.make_timeseries(clock_line_change_times)
-
-        print(clock_line_change_times)
 
         # now generate the clock meta data for the Pseudoclock
         # also generate everytime point each clock line will tick (expand ramps)
@@ -3572,8 +3570,8 @@ def jump(label, t, t_jump):
     # compiler.jump_change_times.append(t)
 
     for pseudoclock in compiler.all_pseudoclocks:
-        pseudoclock.add_jump_cut(t)
-        pseudoclock.add_jump_cut(t_jump)
+        pseudoclock.add_jump_cut(round(t,10))
+        pseudoclock.add_jump_cut(round(t_jump,10))
 
     compiler.wait_monitor.trigger(t_jump, compiler.trigger_duration)
 
