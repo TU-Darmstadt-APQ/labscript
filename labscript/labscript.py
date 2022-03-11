@@ -785,8 +785,6 @@ class Pseudoclock(Device):
         all_change_times.extend(self.parent_device.trigger_times)
 
         all_change_times.extend(compiler.jump_change_times)
-        print("Added ", compiler.jump_change_times)
-        print("ALL", all_change_times)
         
         print(all_change_times, "all_change_times")
         print(self.parent_device.trigger_times, "trigger_times")
@@ -922,8 +920,13 @@ class Pseudoclock(Device):
         for i, time in enumerate(all_change_times):
             # TODO: maybe check if it is a jump point?
             if time in self.parent_device.trigger_times[1:]:
-                # A wait instruction:
-                clock.append('WAIT')
+                print("check time in wait times", time, compiler.jump_change_times, time in compiler.jump_change_times)
+                if time in compiler.jump_change_times:
+                    print("WAIT omitted as it is in jump times")
+                else:
+                    print("append wait at ", time)
+                    # A wait instruction:
+                    clock.append('WAIT')
                 
             # list of enabled clocks
             enabled_clocks = []
@@ -1319,9 +1322,9 @@ class PseudoclockDevice(TriggerableDevice):
             if compiler.wait_monitor is not None:
                 # Make the wait monitor pulse to signify starting or resumption of the experiment:
                 print(f"Trigger wait monitor at {t} for {duration}")
-                if not is_jump:
-                    print("Trigger wait monitor")
-                    compiler.wait_monitor.trigger(t, duration)
+                #if not is_jump:
+                print("Trigger wait monitor")
+                compiler.wait_monitor.trigger(t, duration)
             self.trigger_times.append(t)
             # if is_jump:
             #     self.jump_times.append(t)
@@ -3539,16 +3542,22 @@ def jump_point(t):
 
     # compiler.jump_change_times.append(t+0.00001)
     # compiler.jump_change_times.append(t+0.00101)
-    compiler.jump_change_times.append(t-0.0001)
-    compiler.jump_change_times.append(t+0.0001)
-    compiler.jump_change_times.append(t)
+    # compiler.jump_change_times.append(t-0.0001)
+    # compiler.jump_change_times.append(t+0.0001)
+    # compiler.jump_change_times.append(t)
+
+    compiler.jump_change_times.append(round(t-0.0001,10))
+    compiler.jump_change_times.append(round(t+0.0001,10))
+    compiler.jump_change_times.append(round(t,10))
+
+    #max_delay = trigger_all_pseudoclocks(t, is_jump=True)
 
     return 0.0025
 
 def jump(label, t, t_jump):
     if not str(label):
         raise LabscriptError('Jumps must have a name')
-    # max_delay = trigger_all_pseudoclocks(t, is_jump=True)
+    max_delay = trigger_all_pseudoclocks(t, is_jump=True)
     # max_delay = trigger_all_pseudoclocks(t+0.001, is_jump=True)
     if t in compiler.jump_table:
         raise LabscriptError('There is already a jump at t=%s'%str(t))
@@ -3556,17 +3565,19 @@ def jump(label, t, t_jump):
         raise LabscriptError('There is already a jump named %s'%str(label))
 
 
-    compiler.jump_change_times.append(t-0.0001)
-    compiler.jump_change_times.append(t+0.0001)
-    compiler.jump_change_times.append(t)
+    compiler.jump_change_times.append(round(t-0.0001,10))
+    compiler.jump_change_times.append(round(t+0.0001,10))
+    compiler.jump_change_times.append(round(t,10))
+    # compiler.jump_change_times.append(t+0.0001)
+    # compiler.jump_change_times.append(t)
 
     for pseudoclock in compiler.all_pseudoclocks:
         pseudoclock.add_jump_cut(t)
         pseudoclock.add_jump_cut(t_jump)
 
-    compiler.wait_monitor.trigger(t_jump+0.0001, compiler.trigger_duration)
+    compiler.wait_monitor.trigger(t_jump, compiler.trigger_duration)
 
-    compiler.jump_table[t] = str(label), float(t_jump)
+    compiler.jump_table[round(t,10)] = str(label), float(round(t_jump,10))
 
     return 0.0025
 
