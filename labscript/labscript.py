@@ -3546,10 +3546,18 @@ def trigger_all_pseudoclocks(t='initial', is_jump=False):
     return max_delay + wait_delay
     
 
+def round_time_with_pseudoclock(t):
+    t = compiler.wait_monitor.quantise_to_pseudoclock([round(t,10)])[0]
+    return t
+
+
+
 def jump_instert_timeline_cut(t):
     delta_t = compiler.jump_delta_t
-    compiler.jump_change_times.append(round(t-delta_t,10))
-    compiler.jump_change_times.append(round(t+delta_t,10))
+    compiler.jump_change_times.append(round_time_with_pseudoclock(t-delta_t))
+    final_t = round_time_with_pseudoclock(t+delta_t)
+    compiler.jump_change_times.append(final_t)
+    return final_t
 
 def jump_inster_section_start(t):
     delta_t = compiler.jump_delta_t
@@ -3571,10 +3579,11 @@ def jump_inster_section_start(t):
 def jump_point(t):
     #max_delay = trigger_all_pseudoclocks(t, is_jump=True)
     #trigger_all_pseudoclocks(t+0.0015, is_jump=True)
-    t = round(t,10)
+
+    t = round_time_with_pseudoclock(t)
     print("Jump point ", t)
 
-    jump_instert_timeline_cut(t)
+    final_t = jump_instert_timeline_cut(t)
 
 
     # compiler.jump_change_times.append(round(t-0.001,10))
@@ -3584,7 +3593,7 @@ def jump_point(t):
     # compiler.jump_change_times.append(round(t,10))
     #max_delay = trigger_all_pseudoclocks(t, is_jump=True)
 
-    return 0.0025
+    return final_t
 
 def jump(label, t, t_jump):
     if not str(label):
@@ -3592,8 +3601,8 @@ def jump(label, t, t_jump):
     # max_delay = trigger_all_pseudoclocks(t, is_jump=True)
     # max_delay = trigger_all_pseudoclocks(t+0.001, is_jump=True)
 
-    t = round(t,10)
-    t_jump = round(t_jump,10)
+    t = round_time_with_pseudoclock(t)
+    t_jump = round_time_with_pseudoclock(t_jump)
 
     print("Jump ", t, " to ", t_jump)
 
@@ -3613,7 +3622,7 @@ def jump(label, t, t_jump):
     # compiler.jump_change_times.append(t+0.0001)
     # compiler.jump_change_times.append(t)
 
-    jump_instert_timeline_cut(t)
+    final_t = jump_instert_timeline_cut(t)
 
     jump_inster_section_start(t)
     jump_inster_section_start(t_jump)
@@ -3626,7 +3635,7 @@ def jump(label, t, t_jump):
 
     compiler.jump_table[t] = str(label), float(t_jump)
 
-    return 0.0025
+    return final_t
 
 
 def wait(label, t, timeout=5):
