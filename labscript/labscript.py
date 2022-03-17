@@ -18,6 +18,7 @@ import subprocess
 import socket
 import keyword
 import threading
+import json
 from inspect import getcallargs
 from functools import wraps
 
@@ -3436,12 +3437,19 @@ def write_device_properties(hdf5_file):
 
 def generate_jump_table(hdf5_file):
 
-    dtypes = [('label','a256'), ('time', float), ('to_time', float)]
-    data_array = zeros(len(compiler.jump_table), dtype=dtypes)
+    dtypes = [('label','a256'), ('time', float), ('to_time', float), ('to_label','a256'),('max_jumps',int),('data','a256')]
+    data_array = zeros(len(compiler.transition_table), dtype=dtypes)
 
-    for i, t in enumerate(sorted(compiler.jump_table)):
-        label, to_time = compiler.jump_table[t]
-        data_array[i] = label, t, to_time
+    timestamps = set()
+    timestamps.add(0)
+    timestamps.add(compiler.stop_time)
+    for i in range(len(compiler.transition_table)):
+        transition = compiler.transition_table[i]
+        data_array[i] = transition['label'], transition['time'], transition['to_time'], transition['to_label'], transition['max_jumps'], transition['data']
+
+        timestamps.add(transition['to_time'])
+        timestamps.add(transition['time'])
+
     dataset = hdf5_file.create_dataset('jumps', data = data_array)
 
     jump_device = ''
@@ -3449,9 +3457,19 @@ def generate_jump_table(hdf5_file):
     if compiler.jump_device is not None:
         jump_device = compiler.jump_device.parent_device.name
         jump_device_address = compiler.jump_device.parent_device.address
-
     dataset.attrs['jump_device'] = jump_device
     dataset.attrs['jump_device_address'] = jump_device_address
+
+    # Generate sections table. This is redundant, but makes code generation in devices much easier
+    timestamps = sort(list(timestamps))
+
+    dtypes = [('id',int), ('start_time', float), ('end_time', float)]
+    data_array = zeros(len(timestamps)-1, dtype=dtypes)
+
+    for i in range(len(timestamps)-1):
+        data_array[i] = i, timestamps[i], timestamps[i+1]
+
+    dataset = hdf5_file.create_dataset('sections', data = data_array)
 
 
 def generate_wait_table(hdf5_file):
@@ -3490,6 +3508,7 @@ def generate_wait_table(hdf5_file):
 def generate_code():
     """Compiles a shot and saves it to the shot file.
     """
+    process_jumps()
     if compiler.hdf5_filename is None:
         raise LabscriptError('hdf5 file for compilation not set. Please call labscript_init')
     elif not os.path.exists(compiler.hdf5_filename):
@@ -3551,7 +3570,6 @@ def round_time_with_pseudoclock(t):
     return t
 
 
-
 def jump_instert_timeline_cut(t):
     delta_t = compiler.jump_delta_t
     compiler.jump_change_times.append(round_time_with_pseudoclock(t-delta_t))
@@ -3576,66 +3594,69 @@ def jump_inster_section_start(t):
     compiler.jump_section_starts.append(t)
 
     
-def jump_point(t):
-    #max_delay = trigger_all_pseudoclocks(t, is_jump=True)
-    #trigger_all_pseudoclocks(t+0.0015, is_jump=True)
+def jump_point(label, t):
+    # t += 3*compiler.jump_delta_t # Offset required for clearance
+
+    if not str(label):
+        raise LabscriptError('Jump points must have a label')
+    if label in compiler.jump_point_table.keys():
+        raise LabscriptError('There is already a jump point named %s'%str(label))
 
     t = round_time_with_pseudoclock(t)
-    print("Jump point ", t)
-
     final_t = jump_instert_timeline_cut(t)
 
-
-    # compiler.jump_change_times.append(round(t-0.001,10))
-    # compiler.jump_change_times.append(round(t+0.001,10))
-    # compiler.jump_change_times.append(round(t-0.0001,10))
-    # compiler.jump_change_times.append(round(t+0.0001,10))
-    # compiler.jump_change_times.append(round(t,10))
-    #max_delay = trigger_all_pseudoclocks(t, is_jump=True)
+    compiler.jump_point_table[str(label)] = t
 
     return final_t
 
-def jump(label, t, t_jump):
+def jump(label, t, to_label, max_jumps = 1, additional_data = {}):
+
+    # t += 3*compiler.jump_delta_t # Offset required for clearance
+
     if not str(label):
-        raise LabscriptError('Jumps must have a name')
-    # max_delay = trigger_all_pseudoclocks(t, is_jump=True)
-    # max_delay = trigger_all_pseudoclocks(t+0.001, is_jump=True)
+        raise LabscriptError('Jumps must have a label')
+    if not str(to_label):
+        raise LabscriptError('Jumps must specify to which point in time they jump')
 
     t = round_time_with_pseudoclock(t)
-    t_jump = round_time_with_pseudoclock(t_jump)
-
-    print("Jump ", t, " to ", t_jump)
 
     if t in compiler.jump_table:
         # TODO: check in range
         raise LabscriptError('There is already a jump at t=%s'%str(t))
-    if any([label==existing_label for existing_label, _ in compiler.jump_table.values()]):
+    if any([label==existing_label for existing_label, _, _, _ in compiler.jump_table.values()]):
         raise LabscriptError('There is already a jump named %s'%str(label))
-
-    # TODO: check that t_jump is in jump_points
-
-    # compiler.jump_change_times.append(round(t-0.001,10))
-    # compiler.jump_change_times.append(round(t+0.001,10))
-    # compiler.jump_change_times.append(round(t-0.0001,10))
-    # compiler.jump_change_times.append(round(t+0.0001,10))
-    # compiler.jump_change_times.append(round(t,10))
-    # compiler.jump_change_times.append(t+0.0001)
-    # compiler.jump_change_times.append(t)
 
     final_t = jump_instert_timeline_cut(t)
 
-    jump_inster_section_start(t)
-    jump_inster_section_start(t_jump)
-
-    # for pseudoclock in compiler.all_pseudoclocks:
-    #     pseudoclock.add_jump_cut(round(t,10))
-    #     pseudoclock.add_jump_cut(round(t_jump,10))
-
-    # compiler.wait_monitor.trigger(round(t_jump,10), compiler.trigger_duration)
-
-    compiler.jump_table[t] = str(label), float(t_jump)
+    compiler.jump_table[t] = str(label), str(to_label), int(max_jumps), str(json.dumps(additional_data))
 
     return final_t
+
+
+def process_jumps():
+    compiler.transition_table = []
+    for jump in compiler.jump_table:
+        # Find jump point
+        label, to_label, max_jumps, data = compiler.jump_table[jump]
+        if not to_label in compiler.jump_point_table.keys():
+            raise LabscriptError('There is no jump point named %s'%str(to_label))
+
+        jump_point = compiler.jump_point_table[to_label]
+
+        t_from = jump
+        t_to = jump_point
+
+        jump_inster_section_start(t_from)
+        jump_inster_section_start(t_to)
+
+        compiler.transition_table.append({
+            'label': label,
+            'time': t_from,
+            'to_time': t_to,
+            'to_label': to_label,
+            'max_jumps': max_jumps,
+            'data': data,
+        })
 
 
 def wait(label, t, timeout=5):
@@ -3783,6 +3804,7 @@ def stop(t, target_cycle_time=None, cycle_time_delay_after_programming=False):
     if target_cycle_time is not None:
         # Ensure we have a valid type for this
         target_cycle_time = float(target_cycle_time)
+    compiler.stop_time = t
     compiler.shot_properties['target_cycle_time'] = target_cycle_time
     compiler.shot_properties['cycle_time_delay_after_programming'] = cycle_time_delay_after_programming
     generate_code()
@@ -3885,6 +3907,9 @@ def labscript_cleanup():
     compiler.jump_change_times = []
     compiler.jump_section_starts = []
     compiler.jump_delta_t = 0.0001
+    compiler.jump_point_table = {}
+    compiler.transition_table = []
+    compiler.stop_time = 0
 
 class compiler(object):
     """Compiler object that saves relevant parameters during
@@ -3912,7 +3937,10 @@ class compiler(object):
     shot_properties = {}
     jump_change_times = []
     jump_section_starts = []
+    jump_point_table = {}
+    transition_table = []
     jump_delta_t = 0.0001
+    stop_time = 0
 
     # safety measure in case cleanup is called before init
     _existing_builtins_dict = _builtins_dict.copy() 
