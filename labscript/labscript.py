@@ -3566,7 +3566,7 @@ def trigger_all_pseudoclocks(t='initial', is_jump=False):
     
 
 def round_time_with_pseudoclock(t):
-    t = compiler.wait_monitor.quantise_to_pseudoclock([round(t,10)])[0]
+    t = compiler.master_pseudoclock.quantise_to_pseudoclock([round(t,10)])[0]
     return t
 
 
