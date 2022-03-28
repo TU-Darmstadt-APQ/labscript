@@ -3595,7 +3595,7 @@ def jump_inster_section_start(t):
 
     
 def jump_point(label, t):
-    # t += 3*compiler.jump_delta_t # Offset required for clearance
+    t += 2*compiler.jump_delta_t # Offset required for clearance
 
     if not str(label):
         raise LabscriptError('Jump points must have a label')
@@ -3611,7 +3611,7 @@ def jump_point(label, t):
 
 def jump(label, t, to_label, max_jumps = 1, additional_data = {}):
 
-    # t += 3*compiler.jump_delta_t # Offset required for clearance
+    t += 2*compiler.jump_delta_t # Offset required for clearance
 
     if not str(label):
         raise LabscriptError('Jumps must have a label')
