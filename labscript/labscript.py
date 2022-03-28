@@ -3566,7 +3566,7 @@ def trigger_all_pseudoclocks(t='initial', is_jump=False):
     
 
 def round_time_with_pseudoclock(t):
-    t = compiler.wait_monitor.quantise_to_pseudoclock([round(t,10)])[0]
+    t = compiler.master_pseudoclock.quantise_to_pseudoclock([round(t,10)])[0]
     return t
 
 
@@ -3595,7 +3595,7 @@ def jump_inster_section_start(t):
 
     
 def jump_point(label, t):
-    # t += 3*compiler.jump_delta_t # Offset required for clearance
+    t += 2*compiler.jump_delta_t # Offset required for clearance
 
     if not str(label):
         raise LabscriptError('Jump points must have a label')
@@ -3611,7 +3611,7 @@ def jump_point(label, t):
 
 def jump(label, t, to_label, max_jumps = 1, additional_data = {}):
 
-    # t += 3*compiler.jump_delta_t # Offset required for clearance
+    t += 2*compiler.jump_delta_t # Offset required for clearance
 
     if not str(label):
         raise LabscriptError('Jumps must have a label')
