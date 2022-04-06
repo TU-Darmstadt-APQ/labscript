@@ -786,9 +786,6 @@ class Pseudoclock(Device):
         all_change_times.extend(self.parent_device.trigger_times)
 
         all_change_times.extend(compiler.jump_change_times)
-        
-        # print(all_change_times, "all_change_times")
-        # print(self.parent_device.trigger_times, "trigger_times")
 
         ####################################################################################################
         # Find out whether any other clockline has a change time during a ramp on another clockline.       #
@@ -815,7 +812,6 @@ class Pseudoclock(Device):
         # Get rid of duplicates:
         all_change_times = list(set(all_change_times_numpy))
         all_change_times.sort()  
-        #print("all_change_times, sorted", all_change_times)
         
         # Check that the pseudoclock can handle updates this fast
         for i, t in enumerate(all_change_times[:-1]):
@@ -889,8 +885,6 @@ class Pseudoclock(Device):
             # So store the updated list in the dictionary
             change_times[clock_line] = change_time_list
 
-            #print(all_change_times, change_times)
-
         return all_change_times, change_times
     
     def expand_change_times(self, all_change_times, change_times, outputs_by_clockline):
@@ -924,18 +918,13 @@ class Pseudoclock(Device):
             # TODO: maybe check if it is a jump point?
             if time in self.parent_device.trigger_times[1:]:
 
-                print("Trigger at ", time)
                 time_in_jump_times = False
                 for t_sec in compiler.jump_change_times:
                     if t_sec - compiler.jump_delta_t < time < t_sec + compiler.jump_delta_t:
                         # This section is already known
                         time_in_jump_times = True
                         break
-
-                if time_in_jump_times:
-                    print("WAIT omitted as it is in jump times")
                 else:
-                    print("append wait at ", time)
                     # A wait instruction:
                     clock.append('WAIT')
                 
@@ -1313,7 +1302,6 @@ class PseudoclockDevice(TriggerableDevice):
             self.initial_trigger_time = t
             
     def add_jump_cut(self, t):
-        print("APPEND JUMP CUT",t, round(t,10))
         self.jump_times.append(round(t, 10))
 
     def trigger(self, t, duration, wait_delay = 0, is_jump = False):
@@ -1331,11 +1319,8 @@ class PseudoclockDevice(TriggerableDevice):
         if self.is_master_pseudoclock:
             if compiler.wait_monitor is not None:
                 # Make the wait monitor pulse to signify starting or resumption of the experiment:
-                print(f"Trigger wait monitor at {t} for {duration}")
                 #if not is_jump:
-                print("Trigger wait monitor", t)
                 compiler.wait_monitor.trigger(t, duration)
-            print("Trigger time append", t)
             self.trigger_times.append(t)
             # if is_jump:
             #     self.jump_times.append(t)
@@ -3585,7 +3570,6 @@ def jump_inster_section_start(t):
             return
     # Unknown section -> add start marker
 
-    print("Insert jump section at", t)
     for pseudoclock in compiler.all_pseudoclocks:
         pseudoclock.add_jump_cut(t)
         pseudoclock.trigger(t+delta_t, compiler.trigger_duration, is_jump=True)
