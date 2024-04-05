@@ -3422,7 +3422,7 @@ def write_device_properties(hdf5_file):
 
 def generate_jump_table(hdf5_file):
 
-    dtypes = [('label','a256'), ('time', float), ('to_time', float), ('to_label','a256'),('max_jumps',int),('data','a512')]
+    dtypes = [('label','a256'), ('time', float), ('to_time', float), ('to_label','a256'),('max_jumps',int),('data','a4096')]
     data_array = zeros(len(compiler.transition_table), dtype=dtypes)
 
     timestamps = set()
